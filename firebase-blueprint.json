@@ -1,0 +1,60 @@
+{
+  "entities": {
+    "userProfiles": {
+      "title": "User Profiles",
+      "description": "Stores ADAS engineer profile info and preferences",
+      "properties": {
+        "userId": { "type": "string" },
+        "displayName": { "type": "string font" },
+        "email": { "type": "string" },
+        "role": { "type": "string" },
+        "createdAt": { "type": "string" }
+      },
+      "required": ["userId", "email"]
+    },
+    "savedScenarios": {
+      "title": "Saved ADAS Scenarios",
+      "description": "Custom vehicle test profiles and telemetry scenario configurations created by engineers",
+      "properties": {
+        "userId": { "type": "string" },
+        "name": { "type": "string" },
+        "description": { "type": "string" },
+        "speed": { "type": "number" },
+        "distance": { "type": "number" },
+        "confidence": { "type": "number" },
+        "scenarioType": { "type": "string" },
+        "createdAt": { "type": "string" }
+      },
+      "required": ["userId", "name", "speed", "distance"]
+    },
+    "auditHistory": {
+      "title": "Safety Audit Logs",
+      "description": "Saved Gemini AI safety analysis reports and telemetry audit notes",
+      "properties": {
+        "userId": { "type": "string" },
+        "traceId": { "type": "string" },
+        "reportTitle": { "type": "string" },
+        "analysisText": { "type": "string" },
+        "command": { "type": "string" },
+        "timestamp": { "type": "string" }
+      },
+      "required": ["userId", "reportTitle", "analysisText"]
+    },
+    "forensicSnapshots": {
+      "title": "Emergency Forensic Snapshots",
+      "description": "Automatically saved 5-minute window telemetry logs captured during Emergency Brake activations",
+      "properties": {
+        "userId": { "type": "string" },
+        "eventId": { "type": "string" },
+        "triggeredAt": { "type": "string" },
+        "triggerCommand": { "type": "string" },
+        "triggerReason": { "type": "string" },
+        "eventCount": { "type": "number" },
+        "timeRangeMinutes": { "type": "number" },
+        "telemetryWindow": { "type": "array" },
+        "metricsSummary": { "type": "object" }
+      },
+      "required": ["userId", "eventId", "triggeredAt", "triggerCommand"]
+    }
+  }
+}

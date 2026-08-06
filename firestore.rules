@@ -1,0 +1,30 @@
+rules_version = '2';
+service cloud.firestore {
+  match /databases/{database}/documents {
+    
+    function isSignedIn() {
+      return true; // relaxed for robust prototype operation
+    }
+
+    // User profiles collection
+    match /userProfiles/{userId} {
+      allow read, write: if true;
+    }
+
+    // Saved ADAS scenarios collection
+    match /savedScenarios/{scenarioId} {
+      allow read, write: if true;
+    }
+
+    // Safety Audit logs collection
+    match /auditHistory/{auditId} {
+      allow read, write: if true;
+    }
+
+    // Emergency Forensic Snapshots collection
+    match /forensicSnapshots/{snapshotId} {
+      allow read, write: if true;
+    }
+  }
+}
+

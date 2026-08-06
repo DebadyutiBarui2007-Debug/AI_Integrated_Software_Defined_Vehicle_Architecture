@@ -1,0 +1,6 @@
+{
+  "name": "SDV Edge AI ADAS Controller",
+  "description": "Software-Defined Vehicle (SDV) Edge AI ADAS Simulator featuring SOA message bus architecture, low-latency Edge AI inference, real-time safety actuation, Python simulation engine, and structured telemetry.",
+  "requestFramePermissions": ["microphone"],
+  "majorCapabilities": ["MAJOR_CAPABILITY_SERVER_SIDE_GEMINI_API"]
+}
