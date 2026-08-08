@@ -1,531 +1,356 @@
-/**
- * Software-Defined Vehicle (SDV) Edge AI ADAS Controller Simulation
- * Entry Point: App.tsx
- */
-
-import React, { useState, useEffect, useRef } from "react";
-import { Navbar } from "./components/Navbar";
-import { CockpitHud } from "./components/CockpitHud";
-import { MessageBusInspector } from "./components/MessageBusInspector";
-import { EdgeAiAnalytics } from "./components/EdgeAiAnalytics";
-import { PythonCodeConsole } from "./components/PythonCodeConsole";
-import { TelemetryLogVault } from "./components/TelemetryLogVault";
-import { GeminiSafetyCopilot } from "./components/GeminiSafetyCopilot";
-import { ForensicAnalysisPanel } from "./components/ForensicAnalysisPanel";
-import { SensorMetrics, TelemetryEvent, ScenarioType, ForensicSnapshot } from "./types";
-import { auth, onAuthStateChanged, User, db, collection, addDoc } from "./lib/firebase";
+import React, { useState, useEffect } from "react";
+import { TrafficMetrics, ArchitectureConfig, IndianTrafficScenario } from "./types/indiTraffic";
+import { TrafficTwinCanvas } from "./components/indiTraffic/TrafficTwinCanvas";
+import { ArchitecturalControlsPanel } from "./components/indiTraffic/ArchitecturalControlsPanel";
+import { ThermalAndEfficiencyGauges } from "./components/indiTraffic/ThermalAndEfficiencyGauges";
+import { EconomicCostRoiAnalytics } from "./components/indiTraffic/EconomicCostRoiAnalytics";
+import { AutosarCodeAndCopilot } from "./components/indiTraffic/AutosarCodeAndCopilot";
+import { CanBusAndFirebaseVault } from "./components/indiTraffic/CanBusAndFirebaseVault";
+import { TrafficDensityHeatmap } from "./components/indiTraffic/TrafficDensityHeatmap";
+import { AiMultimodalStudio } from "./components/indiTraffic/AiMultimodalStudio";
+import { UserTutorialModal } from "./components/indiTraffic/UserTutorialModal";
+import {
+  Zap,
+  Sliders,
+  TrendingUp,
+  Code,
+  Radio,
+  Play,
+  Pause,
+  RotateCcw,
+  ShieldAlert,
+  Car,
+  Activity,
+  Award,
+  Sparkles,
+  HelpCircle
+} from "lucide-react";
 
 export default function App() {
-  const [activeTab, setActiveTab] = useState<string>("hud");
+  const [activeTab, setActiveTab] = useState<"TWIN" | "WORKBENCH" | "ROI" | "AUTOSAR" | "CAN_VAULT" | "AI_STUDIO">("TWIN");
   const [isSimulating, setIsSimulating] = useState<boolean>(true);
-  const [activeScenario, setActiveScenario] = useState<ScenarioType>("CRITICAL");
-  const [user, setUser] = useState<User | null>(null);
+  const [isTutorialOpen, setIsTutorialOpen] = useState<boolean>(false);
 
-  // Subscribe to Firebase Authentication state changes
+  // Auto-open tutorial on first visit if not explicitly opted out
   useEffect(() => {
-    const unsubscribe = onAuthStateChanged(auth, (currentUser) => {
-      setUser(currentUser);
-    });
-    return () => unsubscribe();
+    const isCompleted = localStorage.getItem("inditraffic_tutorial_completed");
+    if (!isCompleted) {
+      setIsTutorialOpen(true);
+    }
   }, []);
 
-  // Live Sensor Metrics State
-  const [metrics, setMetrics] = useState<SensorMetrics>({
-    vehicle_speed_kmh: 45.0,
-    obstacle_distance_m: 11.2,
-    camera_confidence: 0.92,
-    time_to_collision_s: 0.9,
-    detected_object_type: "PEDESTRIAN",
-    relative_velocity_ms: -12.5,
-    power_mode: "BALANCED",
-    npu_power_watts: 14.5,
-    inference_latency_ms: 16.5,
-    power_efficiency_percent: 91.2,
-    target_power_efficiency_percent: 90.0,
-    v2x_enabled: true,
-    road_friction: 0.85,
-    traffic_light_state: "GREEN",
-    v2x_latency_ms: 4.2,
-    v2x_intersection_id: "RSU-802-SEATTLE-MAIN"
+  // Architecture Configuration State
+  const [config, setConfig] = useState<ArchitectureConfig>({
+    archType: "INDITRAFFIC_SDV_EDGE",
+    scenario: "SILK_BOARD_CRAWL",
+    pwmMode: "ADAPTIVE_CREEP_6KHZ",
+    microRegenMode: "INDITRAFFIC_MICRO_PEDAL_1.5KMH",
+    lowSpeedRegenCutoffKmh: 1.5,
+    hvacCompressorSpilloverPercent: 40,
+    edgeAiPredictionHorizonMs: 650,
+    brakeBlendRampMs: 45,
+    electricityCostPerKwhInr: 8.5,
+    annualDrivingKm: 18000
   });
 
-  // Telemetry Event Log Store
-  const [telemetryLogs, setTelemetryLogs] = useState<TelemetryEvent[]>([]);
-  const [selectedCopilotLog, setSelectedCopilotLog] = useState<TelemetryEvent | null>(null);
+  // Live Telemetry Engine State
+  const [metrics, setMetrics] = useState<TrafficMetrics>({
+    vehicle_speed_kmh: 8.5,
+    creep_distance_m: 4.2,
+    ambient_temp_c: 42.0,
+    battery_pack_temp_c: 37.8,
+    inverter_junction_temp_c: 74.2,
+    stator_winding_loss_w: 120,
+    hvac_power_kw: 1.4,
+    inverter_switching_loss_w: 110,
+    regen_torque_nm: 145,
+    friction_brake_torque_nm: 12,
+    kinetic_energy_recovered_percent: 38.6,
+    micro_stop_count_per_hr: 142,
+    cut_in_probability: 0.2,
+    predicted_stop_duration_s: 8.5,
+    npu_latency_ms: 3.8,
+    edge_ai_power_w: 4.2,
+    energy_consumption_wh_km: 138,
+    baseline_energy_wh_km: 188,
+    cost_per_km_inr: 1.17,
+    baseline_cost_per_km_inr: 1.60,
+    battery_soh_degradation_rate: 0.4,
+    brake_pad_wear_index: 0.35,
+    timestamp: Date.now()
+  });
 
-  // Forensic Snapshot auto-save state & ref
-  const lastEmergencySaveTimestampRef = useRef<number>(0);
-  const [lastSnapshotInfo, setLastSnapshotInfo] = useState<{
-    snapshotId: string;
-    timestamp: string;
-    count: number;
-  } | null>(null);
-
-  // Helper to save 5-minute forensic telemetry buffer to Firestore or localStorage during Emergency Brake
-  const saveForensicSnapshotToFirestore = async (
-    currentMetrics: SensorMetrics,
-    newLogRecord: TelemetryEvent
-  ) => {
-    const now = Date.now();
-    // 15-second debounce window to prevent continuous write spam during sustained braking
-    if (now - lastEmergencySaveTimestampRef.current < 15000) return;
-    lastEmergencySaveTimestampRef.current = now;
-
-    const fiveMinsAgoUnix = (now - 5 * 60 * 1000) / 1000;
-    const windowLogs = [newLogRecord, ...telemetryLogs].filter(
-      (log) => log.timestamp_unix >= fiveMinsAgoUnix
-    );
-
-    const uid = auth.currentUser?.uid || "LOCAL_ENGINEER_USER";
-    const payload: Omit<ForensicSnapshot, "id"> = {
-      userId: uid,
-      eventId: `EVT-AEB-${Math.random().toString(36).substring(2, 8).toUpperCase()}`,
-      triggeredAt: new Date().toISOString(),
-      triggerCommand: "EMERGENCY_BRAKE",
-      triggerReason: `AUTOMATIC AEB TRIGGER: Obstacle at ${currentMetrics.obstacle_distance_m.toFixed(1)}m, Speed ${currentMetrics.vehicle_speed_kmh.toFixed(1)}km/h, TTC ${currentMetrics.time_to_collision_s.toFixed(2)}s, Surface Friction ${currentMetrics.road_friction ?? 0.85}`,
-      eventCount: windowLogs.length,
-      timeRangeMinutes: 5,
-      telemetryWindow: windowLogs,
-      metricsSummary: currentMetrics
-    };
-
-    try {
-      const docRef = await addDoc(collection(db, "forensicSnapshots"), payload);
-      setLastSnapshotInfo({
-        snapshotId: docRef.id,
-        timestamp: payload.triggeredAt,
-        count: windowLogs.length
-      });
-    } catch (err) {
-      console.warn("Firestore write failed, falling back to localStorage for forensic snapshot:", err);
-      // Fallback to localStorage
-      const localSnapId = `local_${Date.now()}`;
-      const localSnapshot: ForensicSnapshot = { id: localSnapId, ...payload };
-      try {
-        const existingLocal = JSON.parse(localStorage.getItem("sdv_forensic_snapshots") || "[]");
-        localStorage.setItem("sdv_forensic_snapshots", JSON.stringify([localSnapshot, ...existingLocal]));
-        setLastSnapshotInfo({
-          snapshotId: localSnapId,
-          timestamp: payload.triggeredAt,
-          count: windowLogs.length
-        });
-      } catch (localErr) {
-        console.error("LocalStorage fallback failed:", localErr);
-      }
-    }
-  };
-
-  // Compute Actuation Command based on ISO 26262 ADAS Rules & 5G V2X Infrastructure Signals
-  const getActuationCommand = (m: SensorMetrics): "EMERGENCY_BRAKE" | "WARNING" | "MAINTAIN" | "FAILSAFE" => {
-    if (m.sensor_fault || m.sensor_status === "INVALID_DATA" || m.camera_confidence === 0) {
-      return "FAILSAFE";
-    }
-
-    const isV2xActive = m.v2x_enabled ?? true;
-    const friction = isV2xActive ? (m.road_friction ?? 0.85) : 0.85;
-    const lightState = isV2xActive ? (m.traffic_light_state ?? "GREEN") : "NONE";
-
-    // Dynamic braking distance threshold based on surface friction (e.g. 0.2 mu black ice requires ~3x-4x earlier braking)
-    const frictionBrakingThreshold = friction < 0.6 ? 15.0 * (0.85 / Math.max(0.18, friction)) : 15.0;
-
-    // Trigger Emergency Brake for close obstacles under current friction or Red Light violation
-    if (
-      (m.obstacle_distance_m < Math.min(45.0, frictionBrakingThreshold) && m.vehicle_speed_kmh > 20.0) ||
-      (m.obstacle_distance_m < 15.0 && m.vehicle_speed_kmh > 30.0) ||
-      (lightState === "RED" && m.obstacle_distance_m < 35.0 && m.vehicle_speed_kmh > 15.0)
-    ) {
-      return "EMERGENCY_BRAKE";
-    }
-
-    if (
-      m.obstacle_distance_m < (friction < 0.6 ? 35.0 : 25.0) ||
-      m.time_to_collision_s < (friction < 0.6 ? 3.8 : 2.5) ||
-      (lightState === "YELLOW" && m.obstacle_distance_m < 40.0)
-    ) {
-      return "WARNING";
-    }
-
-    return "MAINTAIN";
-  };
-
-  const currentCommand = getActuationCommand(metrics);
-
-  // Helper to append a structured telemetry record
-  const emitTelemetryRecord = (m: SensorMetrics, customLatencyMs?: number) => {
-    const cmd = getActuationCommand(m);
-    const traceId = `TRC-${Math.random().toString(36).substring(2, 9)}`;
-    const isFailsafe = cmd === "FAILSAFE";
-    const isCritical = cmd === "EMERGENCY_BRAKE";
-    const isWarning = cmd === "WARNING";
-
-    const currentMode = m.power_mode || "BALANCED";
-
-    // Power, Latency, and Efficiency parameters depending on power mode
-    let basePower = 14.5;
-    let baseInferenceLatency = 16.5;
-    let baseEfficiency = 91.2;
-    let targetEfficiency = 90.0;
-
-    if (currentMode === "PERFORMANCE") {
-      basePower = 30.5;
-      baseInferenceLatency = 5.8;
-      baseEfficiency = 78.4;
-      targetEfficiency = 85.0;
-    } else if (currentMode === "ENERGY_SAVING") {
-      basePower = 8.8;
-      baseInferenceLatency = 32.4;
-      baseEfficiency = 97.6;
-      targetEfficiency = 95.0;
-    }
-
-    if (isFailsafe) {
-      basePower += 5.5;
-    } else if (isCritical) {
-      basePower += 7.2;
-    } else if (isWarning) {
-      basePower += 3.0;
-    }
-
-    const calculatedPowerWatts = parseFloat(Math.max(5.0, basePower + (Math.random() - 0.5) * 1.2).toFixed(1));
-    const calculatedInferenceLatency = parseFloat(Math.max(2.0, baseInferenceLatency + (Math.random() - 0.5) * 1.5).toFixed(1));
-    const calculatedEfficiency = parseFloat((baseEfficiency + (Math.random() - 0.5) * 1.0).toFixed(1));
-
-    // Simulate variable bus propagation jitter: base latency + network jitter
-    const effectiveLatencyMs = customLatencyMs ?? Math.floor(calculatedInferenceLatency + Math.random() * 20);
-
-    const updatedSensorMetrics: SensorMetrics = {
-      ...m,
-      power_mode: currentMode,
-      npu_power_watts: calculatedPowerWatts,
-      inference_latency_ms: calculatedInferenceLatency,
-      power_efficiency_percent: calculatedEfficiency,
-      target_power_efficiency_percent: targetEfficiency
-    };
-
-    const newLog: TelemetryEvent = {
-      telemetry_spec_version: "1.0.0",
-      trace_id: traceId,
-      vin: "SDV-PROTOTYPE-VIN-2026",
-      timestamp_iso: new Date().toISOString(),
-      timestamp_unix: Date.now() / 1000,
-      effective_latency_ms: effectiveLatencyMs,
-      event: {
-        type: isFailsafe ? "SENSOR_FAULT_DEGRADATION" : "SAFETY_EVALUATION",
-        priority: isFailsafe ? "P0_CRITICAL" : isCritical ? "P0_CRITICAL" : isWarning ? "P1_HIGH" : "P3_NORMAL",
-        actuation_command: cmd,
-        description: isFailsafe
-          ? `FAILSAFE: Injected INVALID_DATA signal into metrics stream (Camera Confidence: ${(m.camera_confidence * 100).toFixed(0)}%, Status: ${m.sensor_status || "INVALID_DATA"}). Controller forced into ISO 26262 ASIL-D FAILSAFE fallback.`
-          : isCritical
-          ? `CRITICAL: Obstacle at ${m.obstacle_distance_m.toFixed(1)}m (<15m) with speed ${m.vehicle_speed_kmh.toFixed(1)}km/h (>30km/h). Triggering Maximum AEB Deceleration!`
-          : isWarning
-          ? `WARNING: Proximity risk at ${m.obstacle_distance_m.toFixed(1)}m, TTC ${m.time_to_collision_s.toFixed(2)}s. Issuing FCW Audio/Visual Alert.`
-          : `Nominal trajectory maintained under ${currentMode} NPU power mode (${calculatedPowerWatts}W, ${calculatedInferenceLatency}ms inference).`
-      },
-      sensor_metrics: updatedSensorMetrics,
-      system_state: {
-        ecu_status: isFailsafe ? "DEGRADED_FAILSAFE" : "ONLINE",
-        bus_protocol: "SOME/IP over Automotive Ethernet (1000BASE-T1)",
-        edge_ai_power_watts: calculatedPowerWatts,
-        effective_latency_ms: effectiveLatencyMs,
-        power_mode: currentMode,
-        power_efficiency_percent: calculatedEfficiency,
-        target_power_efficiency_percent: targetEfficiency,
-        inference_latency_ms: calculatedInferenceLatency
-      }
-    };
-
-    setTelemetryLogs((prev) => [newLog, ...prev.slice(0, 100)]);
-
-    // Trigger automatic save of last 5 minutes telemetry to Firestore if Emergency Brake activated
-    if (isCritical) {
-      saveForensicSnapshotToFirestore(updatedSensorMetrics, newLog);
-    }
-  };
-
-  // Initial Telemetry Seed
-  useEffect(() => {
-    emitTelemetryRecord(metrics, 12);
-  }, []);
-
-  // Global Keyboard Shortcuts Listener ('s' to toggle simulation, '1'-'6' for tabs)
-  useEffect(() => {
-    const handleKeyDown = (e: KeyboardEvent) => {
-      // Do not trigger if modifier keys are pressed (e.g., Ctrl+S, Cmd+1)
-      if (e.metaKey || e.ctrlKey || e.altKey) return;
-
-      // Ignore when user is typing inside input, textarea, select, or editable elements
-      const target = e.target as HTMLElement | null;
-      if (target) {
-        const tagName = target.tagName.toLowerCase();
-        if (
-          tagName === "input" ||
-          tagName === "textarea" ||
-          tagName === "select" ||
-          target.isContentEditable
-        ) {
-          return;
-        }
-      }
-
-      const key = e.key.toLowerCase();
-
-      // Toggle Simulation ('s' or 'S')
-      if (key === "s") {
-        e.preventDefault();
-        setIsSimulating((prev) => !prev);
-        return;
-      }
-
-      // Switch Tabs ('1' - '7')
-      const tabMap: Record<string, string> = {
-        "1": "hud",
-        "2": "bus",
-        "3": "edge",
-        "4": "python",
-        "5": "telemetry",
-        "6": "forensic",
-        "7": "copilot",
-      };
-
-      if (tabMap[key]) {
-        e.preventDefault();
-        setActiveTab(tabMap[key]);
-      }
-    };
-
-    window.addEventListener("keydown", handleKeyDown);
-    return () => window.removeEventListener("keydown", handleKeyDown);
-  }, []);
-
-  // Sensor Bus Simulation Loop with Simulated Network Jitter & Variable Transmission Latency
+  // Simulation Loop Engine
   useEffect(() => {
     if (!isSimulating) return;
 
     const interval = setInterval(() => {
       setMetrics((prev) => {
-        let updated = { ...prev };
+        const isBaseline = config.archType === "LEGACY_CONVENTIONAL_EV";
 
-        if (activeScenario === "SENSOR_FAULT" || prev.sensor_fault) {
-          // Continuously inject corrupted INVALID_DATA signals into metrics stream
-          updated = {
-            ...prev,
-            sensor_fault: true,
-            sensor_status: "INVALID_DATA",
-            camera_confidence: 0.0,
-            detected_object_type: "INVALID_DATA",
-            obstacle_distance_m: -1.0,
-            time_to_collision_s: 0.0
-          };
-        } else if (activeScenario === "SIMULATED") {
-          // Stochastic movement simulation
-          const deltaDist = (Math.random() - 0.5) * 2.0;
-          const newDist = Math.min(50, Math.max(5, prev.obstacle_distance_m + deltaDist));
-          const newSpeed = Math.min(90, Math.max(10, prev.vehicle_speed_kmh + (Math.random() - 0.5) * 3));
-          const ttc = newSpeed > 0 ? newDist / (newSpeed / 3.6) : 99;
+        // Speed fluctuation simulation (Indian traffic stop-and-go)
+        const speedDelta = (Math.random() - 0.5) * 3;
+        const newSpeed = Math.max(0, Math.min(28, prev.vehicle_speed_kmh + speedDelta));
 
-          updated = {
-            ...prev,
-            obstacle_distance_m: parseFloat(newDist.toFixed(1)),
-            vehicle_speed_kmh: parseFloat(newSpeed.toFixed(1)),
-            time_to_collision_s: parseFloat(ttc.toFixed(2))
-          };
+        // Cut-in probability spike
+        const cutInProb = Math.random() < 0.25 ? Math.random() * 0.8 + 0.2 : Math.random() * 0.3;
+
+        // Inverter temp model
+        const pwmLossFactor = config.pwmMode === "FIXED_10KHZ" ? 1.8 : 1.0;
+        const targetInverterTemp = isBaseline ? 88.5 + Math.random() * 4 : 72.0 + Math.random() * 3;
+
+        // Micro-regen energy recovery model
+        const cutoff = config.lowSpeedRegenCutoffKmh;
+        let regenNm = 0;
+        let frictionNm = 0;
+        let regenPercent = 0;
+
+        if (newSpeed < cutoff) {
+          frictionNm = 120 + Math.random() * 40;
+          regenNm = 0;
+          regenPercent = 5.0;
         } else {
-          // Micro variations around fixed scenario
-          const newDist = Math.max(4, prev.obstacle_distance_m + (Math.random() - 0.5) * 0.4);
-          const ttc = prev.vehicle_speed_kmh > 0 ? newDist / (prev.vehicle_speed_kmh / 3.6) : 99;
-          updated = {
-            ...prev,
-            obstacle_distance_m: parseFloat(newDist.toFixed(1)),
-            time_to_collision_s: parseFloat(ttc.toFixed(2))
-          };
+          regenNm = isBaseline ? 45 : 160 + Math.random() * 20;
+          frictionNm = isBaseline ? 95 : 15;
+          regenPercent = isBaseline ? 12.0 : 38.0 + Math.random() * 4;
         }
 
-        // Simulate variable transmission latency (network jitter on SOME/IP vehicle bus: 8ms to 58ms)
-        const busJitterLatencyMs = Math.floor(8 + Math.random() * 50);
-        
-        // Dispatch telemetry record asynchronously after the simulated bus transport delay
-        setTimeout(() => {
-          emitTelemetryRecord(updated, busJitterLatencyMs);
-        }, busJitterLatencyMs);
+        // Energy consumption (Wh/km)
+        const baselineWh = 185 + (42.0 - 25.0) * 0.8; // HVAC heat load
+        const hvacSavedWh = (100 - config.hvacCompressorSpilloverPercent) * 0.35;
+        const optimizedWh = baselineWh - (regenPercent * 0.9) - hvacSavedWh;
 
-        return updated;
+        const energyWh = isBaseline ? baselineWh : Math.max(120, optimizedWh);
+
+        return {
+          ...prev,
+          vehicle_speed_kmh: newSpeed,
+          creep_distance_m: Math.max(1.2, 3.5 + (Math.random() - 0.5) * 2),
+          ambient_temp_c: config.scenario === "OLD_DELHI_SWARM" ? 44.0 : 42.0,
+          inverter_junction_temp_c: targetInverterTemp,
+          battery_pack_temp_c: isBaseline ? 44.2 : 37.5,
+          inverter_switching_loss_w: isBaseline ? 280 : 120,
+          hvac_power_kw: isBaseline ? 3.2 : (3.2 * config.hvacCompressorSpilloverPercent) / 100,
+          regen_torque_nm: regenNm,
+          friction_brake_torque_nm: frictionNm,
+          kinetic_energy_recovered_percent: regenPercent,
+          cut_in_probability: cutInProb,
+          npu_latency_ms: isBaseline ? 18.5 : 3.8 + Math.random() * 0.4,
+          energy_consumption_wh_km: energyWh,
+          baseline_energy_wh_km: baselineWh,
+          cost_per_km_inr: (energyWh / 1000) * config.electricityCostPerKwhInr,
+          baseline_cost_per_km_inr: (baselineWh / 1000) * config.electricityCostPerKwhInr,
+          brake_pad_wear_index: isBaseline ? 1.0 : 0.36,
+          timestamp: Date.now()
+        };
       });
     }, 1000);
 
     return () => clearInterval(interval);
-  }, [isSimulating, activeScenario]);
+  }, [isSimulating, config]);
 
-  // Handler to toggle sensor fault state / inject INVALID_DATA signals
-  const handleToggleSensorFault = () => {
-    setMetrics((prev) => {
-      const isCurrentlyFaulty = prev.sensor_fault || prev.sensor_status === "INVALID_DATA";
-      if (isCurrentlyFaulty) {
-        // Clear Sensor Fault -> Restore Nominal State
-        setActiveScenario("SAFE");
-        const restored: SensorMetrics = {
-          ...prev,
-          sensor_fault: false,
-          sensor_status: "NORMAL",
-          camera_confidence: 0.92,
-          detected_object_type: "PEDESTRIAN",
-          obstacle_distance_m: 28.5,
-          vehicle_speed_kmh: 40.0,
-          time_to_collision_s: 2.56
-        };
-        emitTelemetryRecord(restored, 10);
-        return restored;
-      } else {
-        // Inject Sensor Fault -> Force FAILSAFE Mode
-        setActiveScenario("SENSOR_FAULT");
-        const faulty: SensorMetrics = {
-          ...prev,
-          sensor_fault: true,
-          sensor_status: "INVALID_DATA",
-          camera_confidence: 0.0,
-          detected_object_type: "INVALID_DATA",
-          obstacle_distance_m: -1.0,
-          time_to_collision_s: 0.0
-        };
-        emitTelemetryRecord(faulty, 8);
-        return faulty;
-      }
-    });
-  };
-
-  // Scenario Switcher Handler
-  const handleApplyScenario = (scenario: ScenarioType) => {
-    if (scenario === "SENSOR_FAULT") {
-      handleToggleSensorFault();
-      return;
-    }
-
-    setActiveScenario(scenario);
-    let updated: Partial<SensorMetrics> = {
-      sensor_fault: false,
-      sensor_status: "NORMAL"
-    };
-
-    if (scenario === "CRITICAL") {
-      updated = {
-        ...updated,
-        vehicle_speed_kmh: 45.0,
-        obstacle_distance_m: 11.2,
-        camera_confidence: 0.92,
-        time_to_collision_s: 0.9,
-        detected_object_type: "PEDESTRIAN"
-      };
-    } else if (scenario === "WARNING") {
-      updated = {
-        ...updated,
-        vehicle_speed_kmh: 50.0,
-        obstacle_distance_m: 21.0,
-        camera_confidence: 0.88,
-        time_to_collision_s: 1.5,
-        detected_object_type: "VEHICLE"
-      };
-    } else if (scenario === "SAFE") {
-      updated = {
-        ...updated,
-        vehicle_speed_kmh: 60.0,
-        obstacle_distance_m: 42.0,
-        camera_confidence: 0.98,
-        time_to_collision_s: 2.52,
-        detected_object_type: "ROAD_CLEAR"
-      };
-    }
-
-    setMetrics((prev) => {
-      const merged = { ...prev, ...updated };
-      const latencyMs = Math.floor(6 + Math.random() * 24);
-      emitTelemetryRecord(merged, latencyMs);
-      return merged;
-    });
-  };
-
-  const handleMetricsChange = (changed: Partial<SensorMetrics>) => {
-    setActiveScenario("CUSTOM");
-    setMetrics((prev) => {
-      const merged = { ...prev, ...changed };
-      const latencyMs = Math.floor(6 + Math.random() * 24);
-      emitTelemetryRecord(merged, latencyMs);
-      return merged;
-    });
+  const handleTriggerCutInEvent = () => {
+    setMetrics((prev) => ({
+      ...prev,
+      cut_in_probability: 0.92,
+      creep_distance_m: 1.5,
+      vehicle_speed_kmh: 4.2
+    }));
   };
 
   return (
-    <div className="min-h-screen bg-slate-950 text-slate-100 flex flex-col font-sans selection:bg-cyan-500 selection:text-slate-950">
-      {/* Top Navbar Header */}
-      <Navbar
-        activeTab={activeTab}
-        setActiveTab={setActiveTab}
-        isSimulating={isSimulating}
-        onToggleSimulation={() => setIsSimulating(!isSimulating)}
-        lastCommand={currentCommand}
-        user={user}
-      />
+    <div className="min-h-screen bg-slate-950 text-slate-100 font-sans selection:bg-sky-500 selection:text-white pb-12">
+      {/* Top Header */}
+      <header className="bg-slate-900 border-b border-slate-800 sticky top-0 z-50">
+        <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 py-3.5 flex flex-wrap items-center justify-between gap-4">
+          <div className="flex items-center gap-3">
+            <div className="p-2.5 bg-gradient-to-br from-sky-500 to-indigo-600 rounded-xl shadow-lg shadow-sky-500/20 text-white">
+              <Car className="w-6 h-6" />
+            </div>
+            <div>
+              <div className="flex items-center gap-2">
+                <h1 className="text-lg font-bold text-white tracking-tight">
+                  IndiTraffic SDV Edge Architect
+                </h1>
+                <span className="px-2 py-0.5 rounded-full bg-emerald-500/20 text-emerald-400 border border-emerald-500/30 text-[10px] font-mono font-semibold">
+                  v2.4 EV OPTIMIZER
+                </span>
+              </div>
+              <p className="text-xs text-slate-400">
+                Stop-and-Go Thermal, Micro-Regen, & Cost Efficiency Architecture for Indian Urban Traffic
+              </p>
+            </div>
+          </div>
 
-      {/* Main Content Area */}
-      <main className="flex-1 max-w-7xl w-full mx-auto p-4 sm:p-6 lg:p-8 space-y-6">
-        {activeTab === "hud" && (
-          <CockpitHud
+          <div className="flex items-center gap-3">
+            <div className="hidden md:flex items-center gap-2 px-3 py-1.5 rounded-lg bg-slate-950 border border-slate-800 text-xs">
+              <Activity className="w-4 h-4 text-emerald-400 animate-pulse" />
+              <span className="text-slate-400">CAN HS1:</span>
+              <strong className="text-emerald-400 font-mono">ONLINE (500k)</strong>
+            </div>
+
+            <button
+              onClick={() => setIsSimulating(!isSimulating)}
+              className={`px-3.5 py-1.5 rounded-lg text-xs font-semibold flex items-center gap-1.5 transition shadow ${
+                isSimulating
+                  ? "bg-amber-500/20 text-amber-400 border border-amber-500/30 hover:bg-amber-500/30"
+                  : "bg-emerald-600 text-white hover:bg-emerald-500"
+              }`}
+            >
+              {isSimulating ? <Pause className="w-3.5 h-3.5" /> : <Play className="w-3.5 h-3.5" />}
+              {isSimulating ? "Pause Twin" : "Run Twin"}
+            </button>
+
+            <button
+              onClick={handleTriggerCutInEvent}
+              className="px-3.5 py-1.5 bg-rose-600 hover:bg-rose-500 text-white text-xs font-semibold rounded-lg flex items-center gap-1.5 transition shadow"
+            >
+              <ShieldAlert className="w-3.5 h-3.5" />
+              Inject Cut-In Event
+            </button>
+
+            <button
+              onClick={() => setIsTutorialOpen(true)}
+              className="px-3.5 py-1.5 bg-sky-950/80 hover:bg-sky-900 text-sky-300 border border-sky-700/60 hover:border-sky-500 text-xs font-semibold rounded-lg flex items-center gap-1.5 transition shadow"
+            >
+              <HelpCircle className="w-4 h-4 text-sky-400" />
+              <span>Interactive Guide</span>
+            </button>
+          </div>
+        </div>
+      </header>
+
+      {/* Main Container */}
+      <main className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 pt-6 space-y-6">
+        {/* Navigation Tabs */}
+        <div className="flex overflow-x-auto bg-slate-900 p-1.5 rounded-xl border border-slate-800 gap-1 scrollbar-none">
+          <button
+            onClick={() => setActiveTab("TWIN")}
+            className={`px-4 py-2 rounded-lg text-xs font-semibold flex items-center gap-2 transition whitespace-nowrap ${
+              activeTab === "TWIN"
+                ? "bg-sky-600 text-white shadow-lg shadow-sky-600/30"
+                : "text-slate-400 hover:text-white hover:bg-slate-800"
+            }`}
+          >
+            <Car className="w-4 h-4" />
+            Live Traffic Twin & Telemetry
+          </button>
+
+          <button
+            onClick={() => setActiveTab("WORKBENCH")}
+            className={`px-4 py-2 rounded-lg text-xs font-semibold flex items-center gap-2 transition whitespace-nowrap ${
+              activeTab === "WORKBENCH"
+                ? "bg-sky-600 text-white shadow-lg shadow-sky-600/30"
+                : "text-slate-400 hover:text-white hover:bg-slate-800"
+            }`}
+          >
+            <Sliders className="w-4 h-4" />
+            SDV Architecture Workbench
+          </button>
+
+          <button
+            onClick={() => setActiveTab("ROI")}
+            className={`px-4 py-2 rounded-lg text-xs font-semibold flex items-center gap-2 transition whitespace-nowrap ${
+              activeTab === "ROI"
+                ? "bg-sky-600 text-white shadow-lg shadow-sky-600/30"
+                : "text-slate-400 hover:text-white hover:bg-slate-800"
+            }`}
+          >
+            <TrendingUp className="w-4 h-4" />
+            Indian Market ROI & Cost Analytics
+          </button>
+
+          <button
+            onClick={() => setActiveTab("AUTOSAR")}
+            className={`px-4 py-2 rounded-lg text-xs font-semibold flex items-center gap-2 transition whitespace-nowrap ${
+              activeTab === "AUTOSAR"
+                ? "bg-sky-600 text-white shadow-lg shadow-sky-600/30"
+                : "text-slate-400 hover:text-white hover:bg-slate-800"
+            }`}
+          >
+            <Code className="w-4 h-4" />
+            AUTOSAR Code & Gemini Copilot
+          </button>
+
+          <button
+            onClick={() => setActiveTab("CAN_VAULT")}
+            className={`px-4 py-2 rounded-lg text-xs font-semibold flex items-center gap-2 transition whitespace-nowrap ${
+              activeTab === "CAN_VAULT"
+                ? "bg-sky-600 text-white shadow-lg shadow-sky-600/30"
+                : "text-slate-400 hover:text-white hover:bg-slate-800"
+            }`}
+          >
+            <Radio className="w-4 h-4" />
+            CAN Bus Stream & Cloud Vault
+          </button>
+
+          <button
+            onClick={() => setActiveTab("AI_STUDIO")}
+            className={`px-4 py-2 rounded-lg text-xs font-semibold flex items-center gap-2 transition whitespace-nowrap ${
+              activeTab === "AI_STUDIO"
+                ? "bg-gradient-to-r from-sky-600 to-purple-600 text-white shadow-lg shadow-purple-600/30"
+                : "text-slate-400 hover:text-white hover:bg-slate-800"
+            }`}
+          >
+            <Sparkles className="w-4 h-4 text-purple-400" />
+            Gemini Multimodal Studio
+          </button>
+        </div>
+
+        {/* Global Live Gauges Bar (Always visible for instant feedback) */}
+        <ThermalAndEfficiencyGauges metrics={metrics} config={config} />
+
+        {/* Tab Content Display */}
+        {activeTab === "TWIN" && (
+          <div className="space-y-6">
+            <TrafficTwinCanvas metrics={metrics} config={config} isSimulating={isSimulating} />
+            <TrafficDensityHeatmap metrics={metrics} config={config} />
+            <EconomicCostRoiAnalytics
+              metrics={metrics}
+              config={config}
+              onConfigChange={(updated) => setConfig((prev) => ({ ...prev, ...updated }))}
+            />
+          </div>
+        )}
+
+        {activeTab === "WORKBENCH" && (
+          <div className="space-y-6">
+            <ArchitecturalControlsPanel config={config} onChange={setConfig} />
+            <TrafficTwinCanvas metrics={metrics} config={config} isSimulating={isSimulating} />
+          </div>
+        )}
+
+        {activeTab === "ROI" && (
+          <EconomicCostRoiAnalytics
             metrics={metrics}
-            onMetricsChange={handleMetricsChange}
-            lastCommand={currentCommand}
-            onApplyScenario={handleApplyScenario}
-            activeScenario={activeScenario}
-            onToggleSensorFault={handleToggleSensorFault}
-            telemetryLogs={telemetryLogs}
-            isSimulating={isSimulating}
+            config={config}
+            onConfigChange={(updated) => setConfig((prev) => ({ ...prev, ...updated }))}
           />
         )}
 
-        {activeTab === "bus" && (
-          <MessageBusInspector metrics={metrics} lastCommand={currentCommand} />
+        {activeTab === "AUTOSAR" && (
+          <AutosarCodeAndCopilot metrics={metrics} config={config} />
         )}
 
-        {activeTab === "edge" && (
-          <EdgeAiAnalytics metrics={metrics} lastCommand={currentCommand} telemetryLogs={telemetryLogs} />
+        {activeTab === "CAN_VAULT" && (
+          <CanBusAndFirebaseVault metrics={metrics} config={config} />
         )}
 
-        {activeTab === "python" && (
-          <PythonCodeConsole
-            metrics={metrics}
-            onTelemetryReceived={(t) => setTelemetryLogs((prev) => [t, ...prev])}
-          />
-        )}
-
-        {activeTab === "telemetry" && (
-          <TelemetryLogVault
-            logs={telemetryLogs}
-            onClearLogs={() => setTelemetryLogs([])}
-            onSelectLogForCopilot={(log) => {
-              setSelectedCopilotLog(log);
-              setActiveTab("copilot");
-            }}
-            user={user}
-          />
-        )}
-
-        {activeTab === "forensic" && (
-          <ForensicAnalysisPanel
-            telemetryLogs={telemetryLogs}
-            metrics={metrics}
-            lastSnapshotInfo={lastSnapshotInfo}
-          />
-        )}
-
-        {activeTab === "copilot" && (
-          <GeminiSafetyCopilot
-            selectedLog={selectedCopilotLog}
-            latestLog={telemetryLogs[0] || null}
-          />
+        {activeTab === "AI_STUDIO" && (
+          <AiMultimodalStudio />
         )}
       </main>
 
-      {/* Footer */}
-      <footer className="border-t border-slate-800/80 bg-slate-900/50 py-4 text-center text-xs text-slate-500 font-mono">
-        <p>Software-Defined Vehicle (SDV) Edge AI ADAS Controller &bull; ISO 26262 ASIL-D System Architecture &bull; SOME/IP &amp; ROS 2</p>
-      </footer>
+      {/* User Onboarding Interactive Tutorial Modal */}
+      <UserTutorialModal
+        isOpen={isTutorialOpen}
+        onClose={() => setIsTutorialOpen(false)}
+        activeTab={activeTab}
+        setActiveTab={setActiveTab}
+        onTriggerCutInEvent={handleTriggerCutInEvent}
+        onToggleSimulation={() => setIsSimulating(!isSimulating)}
+        isSimulating={isSimulating}
+      />
     </div>
   );
 }

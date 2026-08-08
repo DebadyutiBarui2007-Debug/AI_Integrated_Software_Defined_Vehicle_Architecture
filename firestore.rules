@@ -25,6 +25,16 @@ service cloud.firestore {
     match /forensicSnapshots/{snapshotId} {
       allow read, write: if true;
     }
+
+    // IndiTraffic Snapshots collection
+    match /indiTrafficSnapshots/{snapshotId} {
+      allow read, write: if true;
+    }
+
+    // Wildcard fallback for any collection
+    match /{document=**} {
+      allow read, write: if true;
+    }
   }
 }
 
