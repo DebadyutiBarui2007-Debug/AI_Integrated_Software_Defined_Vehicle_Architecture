@@ -22,6 +22,185 @@ import {
 } from "lucide-react";
 import { auth, signInWithPopup, googleProvider, signOut, signInAnonymously, onAuthStateChanged, User } from "../../lib/firebase";
 
+const VeoFallbackAnimation: React.FC<{ prompt: string; aspectRatio: "16:9" | "9:16" }> = ({ prompt, aspectRatio }) => {
+  const canvasRef = useRef<HTMLCanvasElement>(null);
+
+  useEffect(() => {
+    const canvas = canvasRef.current;
+    if (!canvas) return;
+    const ctx = canvas.getContext("2d");
+    if (!ctx) return;
+
+    let animationFrameId: number;
+    let offset = 0;
+    let particleOffset = 0;
+
+    // Surrounding vehicles state
+    const surroundingVehicles = [
+      { x: 120, y: 150, speed: 0.8, color: "#f43f5e", label: "Auto-Rickshaw" },
+      { x: 280, y: 180, speed: 0.5, color: "#eab308", label: "Crawl Cab" },
+      { x: 200, y: 90, speed: 1.2, color: "#38bdf8", label: "Ego EV" }
+    ];
+
+    const resizeCanvas = () => {
+      const rect = canvas.getBoundingClientRect();
+      canvas.width = rect.width;
+      canvas.height = rect.height;
+    };
+    resizeCanvas();
+    window.addEventListener("resize", resizeCanvas);
+
+    const draw = () => {
+      ctx.fillStyle = "#020617";
+      ctx.fillRect(0, 0, canvas.width, canvas.height);
+
+      const w = canvas.width;
+      const h = canvas.height;
+
+      // 1. Draw 3D Perspective Road
+      ctx.strokeStyle = "#1e293b";
+      ctx.lineWidth = 1;
+      const horizontalLineCount = 10;
+      for (let i = 0; i < horizontalLineCount; i++) {
+        const y = h/2 + (i / horizontalLineCount) * (h/2);
+        ctx.beginPath();
+        ctx.moveTo(0, y);
+        ctx.lineTo(w, y);
+        ctx.stroke();
+      }
+
+      // Vertical perspective lines converging to the center horizon (w/2, h/2)
+      const centerX = w / 2;
+      const horizonY = h / 2.2;
+      const laneCount = 6;
+      ctx.strokeStyle = "#334155";
+      for (let i = -laneCount/2; i <= laneCount/2; i++) {
+        const targetX = centerX + i * (w / (laneCount - 1)) * 1.5;
+        ctx.beginPath();
+        ctx.moveTo(centerX, horizonY);
+        ctx.lineTo(targetX, h);
+        ctx.stroke();
+      }
+
+      // Animated road dash lines
+      ctx.strokeStyle = "#10b981";
+      ctx.lineWidth = 3;
+      ctx.setLineDash([15, 20]);
+      ctx.lineDashOffset = -offset;
+      ctx.beginPath();
+      // Left lane divider
+      ctx.moveTo(centerX - 40, horizonY);
+      ctx.lineTo(centerX - 120, h);
+      // Right lane divider
+      ctx.moveTo(centerX + 40, horizonY);
+      ctx.lineTo(centerX + 120, h);
+      ctx.stroke();
+      ctx.setLineDash([]);
+
+      // Update background road scrolling
+      offset = (offset + 1.2) % 35;
+
+      // 2. Draw vehicles with perspective scaling
+      surroundingVehicles.forEach((v) => {
+        const scale = (v.y / h) * 1.2;
+        const currentX = centerX + (v.x - centerX) * scale;
+        
+        ctx.fillStyle = "rgba(0, 0, 0, 0.4)";
+        ctx.fillRect(currentX - 25 * scale, v.y + 10 * scale, 50 * scale, 15 * scale);
+
+        ctx.fillStyle = v.color;
+        ctx.beginPath();
+        // Fallback for roundRect
+        if (ctx.roundRect) {
+          ctx.roundRect(currentX - 20 * scale, v.y - 15 * scale, 40 * scale, 30 * scale, 6 * scale);
+        } else {
+          ctx.rect(currentX - 20 * scale, v.y - 15 * scale, 40 * scale, 30 * scale);
+        }
+        ctx.fill();
+
+        ctx.fillStyle = "#ef4444";
+        ctx.fillRect(currentX - 16 * scale, v.y + 12 * scale, 6 * scale, 3 * scale);
+        ctx.fillRect(currentX + 10 * scale, v.y + 12 * scale, 6 * scale, 3 * scale);
+
+        ctx.fillStyle = "#eab308";
+        ctx.fillRect(currentX - 16 * scale, v.y - 15 * scale, 6 * scale, 3 * scale);
+        ctx.fillRect(currentX + 10 * scale, v.y - 15 * scale, 6 * scale, 3 * scale);
+
+        ctx.fillStyle = "#94a3b8";
+        ctx.font = `bold ${Math.max(8, 9 * scale)}px monospace`;
+        ctx.fillText(v.label, currentX - 18 * scale, v.y - 20 * scale);
+
+        v.y = horizonY + 20 + ((v.y - horizonY - 20 + v.speed) % (h - horizonY - 40));
+      });
+
+      ctx.fillStyle = "rgba(16, 185, 129, 0.03)";
+      ctx.fillRect(0, 0, w, h);
+
+      ctx.strokeStyle = "rgba(16, 185, 129, 0.2)";
+      ctx.lineWidth = 1;
+      ctx.strokeRect(10, 10, w - 20, h - 20);
+
+      particleOffset = (particleOffset + 0.5) % h;
+      ctx.fillStyle = "rgba(16, 185, 129, 0.06)";
+      ctx.fillRect(10, particleOffset, w - 20, 2);
+
+      ctx.strokeStyle = "#10b981";
+      ctx.lineWidth = 2;
+      const cornerLen = 15;
+      const corners = [
+        [10, 10, 1, 1],
+        [w - 10, 10, -1, 1],
+        [10, h - 10, 1, -1],
+        [w - 10, h - 10, -1, -1]
+      ];
+      corners.forEach(([x, y, dx, dy]) => {
+        ctx.beginPath();
+        ctx.moveTo(x, y + cornerLen * dy);
+        ctx.lineTo(x, y);
+        ctx.lineTo(x + cornerLen * dx, y);
+        ctx.stroke();
+      });
+
+      ctx.fillStyle = "#10b981";
+      ctx.font = "bold 10px monospace";
+      ctx.fillText("VEO SANDBOX TRAFFIC SIMULATOR", 20, 30);
+      
+      ctx.fillStyle = "#64748b";
+      ctx.font = "9px monospace";
+      ctx.fillText(`SCENARIO: ${prompt.substring(0, 42)}...`, 20, 45);
+      ctx.fillText("ENGINE: GEOMETRIC VECTOR INTERFERENCE", 20, 58);
+      ctx.fillText("STATUS: STABLE RENDER (FALLBACK MODE)", 20, 71);
+
+      ctx.fillStyle = "#eab308";
+      ctx.font = "bold 9px monospace";
+      ctx.fillText("REGEN CREEP: 1.5 km/h", w - 140, h - 45);
+      ctx.fillStyle = "#10b981";
+      ctx.fillText("INVERTER TEMP: 72.4°C", w - 140, h - 32);
+      ctx.fillText("FPS: 60.0 STABLE", w - 140, h - 20);
+
+      animationFrameId = requestAnimationFrame(draw);
+    };
+
+    draw();
+
+    return () => {
+      cancelAnimationFrame(animationFrameId);
+      window.removeEventListener("resize", resizeCanvas);
+    };
+  }, [prompt]);
+
+  const heightClass = aspectRatio === "9:16" ? "h-96" : "h-64";
+
+  return (
+    <div className={`w-full ${heightClass} rounded-lg overflow-hidden relative border border-slate-800`}>
+      <canvas ref={canvasRef} className="w-full h-full block" />
+      <div className="absolute top-3 right-3 bg-emerald-950/80 border border-emerald-500/30 text-emerald-400 text-[10px] font-mono px-2 py-0.5 rounded shadow">
+        ⚡ Veo Sandbox Fallback Active
+      </div>
+    </div>
+  );
+};
+
 export const AiMultimodalStudio: React.FC = () => {
   const [activeSubTab, setActiveSubTab] = useState<"CHAT" | "IMAGE" | "VIDEO" | "MUSIC" | "VOICE">("CHAT");
   const [user, setUser] = useState<User | null>(null);
@@ -177,10 +356,12 @@ export const AiMultimodalStudio: React.FC = () => {
   const [veoStatus, setVeoStatus] = useState<string | null>(null);
   const [veoVideoUrl, setVeoVideoUrl] = useState<string | null>(null);
   const [isVeoGenerating, setIsVeoGenerating] = useState(false);
+  const [isVeoFallback, setIsVeoFallback] = useState(false);
 
   const handleGenerateVeoVideo = async () => {
     setIsVeoGenerating(true);
     setVeoVideoUrl(null);
+    setIsVeoFallback(false);
     setVeoStatus("Initiating Veo 3.1 video generation...");
 
     try {
@@ -195,8 +376,15 @@ export const AiMultimodalStudio: React.FC = () => {
       });
 
       const startData = await startRes.json();
-      if (!startRes.ok || !startData.operationName) {
+      if (!startRes.ok) {
         throw new Error(startData.error || "Failed to initiate video generation.");
+      }
+
+      if (startData.isFallback) {
+        setIsVeoFallback(true);
+        setVeoStatus(startData.notes || "Rendering custom simulated traffic animation...");
+        setIsVeoGenerating(false);
+        return;
       }
 
       const opName = startData.operationName;
@@ -835,9 +1023,11 @@ export const AiMultimodalStudio: React.FC = () => {
             </div>
 
             {/* Video Player Box */}
-            <div className="bg-slate-950 p-4 rounded-xl border border-slate-800 flex flex-col items-center justify-center min-h-[260px]">
+            <div className="bg-slate-950 p-4 rounded-xl border border-slate-800 flex flex-col items-center justify-center min-h-[260px] w-full">
               {veoVideoUrl ? (
                 <video controls src={veoVideoUrl} className="max-h-64 rounded-lg shadow-xl w-full" autoPlay loop />
+              ) : isVeoFallback ? (
+                <VeoFallbackAnimation prompt={veoPrompt} aspectRatio={veoAspectRatio} />
               ) : (
                 <p className="text-xs text-slate-500 text-center">
                   Rendered Veo 3D traffic video simulation will appear here.
