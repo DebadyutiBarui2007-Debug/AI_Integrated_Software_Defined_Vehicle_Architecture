@@ -6,14 +6,12 @@ import { GoogleGenAI, ThinkingLevel, GenerateVideosOperation } from "@google/gen
 import { createServer as createViteServer } from "vite";
 import { WebSocketServer } from "ws";
 
-async function startServer() {
-  const app = express();
-  const PORT = 3000;
+export const app = express();
 
-  app.use(express.json({ limit: "20mb" }));
+app.use(express.json({ limit: "20mb" }));
 
-  // Helper to instantiate GenAI
-  const getGenAI = () => {
+// Helper to instantiate GenAI
+const getGenAI = () => {
     const apiKey = process.env.GEMINI_API_KEY;
     if (!apiKey) return null;
     return new GoogleGenAI({
@@ -738,81 +736,87 @@ function generateFallbackAvasWavBase64(): string {
     }
   });
 
-  // Vite Middleware setup for dev vs production
-  if (process.env.NODE_ENV !== "production") {
-    const vite = await createViteServer({
-      server: { middlewareMode: true },
-      appType: "spa",
+  // Standalone server initialization for local/container dev & production
+  async function startStandaloneServer() {
+    const PORT = 3000;
+
+    // Vite Middleware setup for dev vs production
+    if (process.env.NODE_ENV !== "production") {
+      const vite = await createViteServer({
+        server: { middlewareMode: true },
+        appType: "spa",
+      });
+      app.use(vite.middlewares);
+    } else {
+      const distPath = path.join(process.cwd(), "dist");
+      app.use(express.static(distPath));
+      app.get("*", (req, res) => {
+        res.sendFile(path.join(distPath, "index.html"));
+      });
+    }
+
+    const server = app.listen(PORT, "0.0.0.0", () => {
+      console.log(`SDV ADAS Controller Server listening on http://0.0.0.0:${PORT}`);
     });
-    app.use(vite.middlewares);
-  } else {
-    const distPath = path.join(process.cwd(), "dist");
-    app.use(express.static(distPath));
-    app.get("*", (req, res) => {
-      res.sendFile(path.join(distPath, "index.html"));
+
+    // Gemini Live API WebSocket Server Attachment
+    const wss = new WebSocketServer({ server, path: "/api/gemini/live" });
+
+    wss.on("connection", async (ws) => {
+      console.log("Gemini Live WebSocket Client Connected");
+      const ai = getGenAI();
+      if (!ai) {
+        ws.send(JSON.stringify({ error: "GEMINI_API_KEY not configured." }));
+        ws.close();
+        return;
+      }
+
+      try {
+        const session = await ai.live.connect({
+          model: "gemini-3.1-flash-live-preview",
+          config: {
+            responseModalities: ["AUDIO" as any],
+            speechConfig: {
+              voiceConfig: { prebuiltVoiceConfig: { voiceName: "Zephyr" } }
+            },
+            systemInstruction: "You are an onboard Vehicle Edge AI Copilot for Indian Urban Traffic SDVs. Keep spoken responses short, technical, and direct."
+          },
+          callbacks: {
+            onmessage: (message) => {
+              const audio = message.serverContent?.modelTurn?.parts?.[0]?.inlineData?.data;
+              if (audio) {
+                ws.send(JSON.stringify({ audio }));
+              }
+              if (message.serverContent?.interrupted) {
+                ws.send(JSON.stringify({ interrupted: true }));
+              }
+            }
+          }
+        });
+
+        ws.on("message", (data) => {
+          try {
+            const parsed = JSON.parse(data.toString());
+            if (parsed.audio) {
+              session.sendRealtimeInput({
+                audio: { data: parsed.audio, mimeType: "audio/pcm;rate=16000" }
+              });
+            }
+          } catch (e) {
+            console.error("Error parsing WS message:", e);
+          }
+        });
+
+        ws.on("close", () => {
+          session.close();
+        });
+      } catch (err: any) {
+        console.error("Live session connection error:", err);
+        ws.send(JSON.stringify({ error: err.message }));
+      }
     });
   }
 
-  const server = app.listen(PORT, "0.0.0.0", () => {
-    console.log(`SDV ADAS Controller Server listening on http://0.0.0.0:${PORT}`);
-  });
-
-  // Gemini Live API WebSocket Server Attachment
-  const wss = new WebSocketServer({ server, path: "/api/gemini/live" });
-
-  wss.on("connection", async (ws) => {
-    console.log("Gemini Live WebSocket Client Connected");
-    const ai = getGenAI();
-    if (!ai) {
-      ws.send(JSON.stringify({ error: "GEMINI_API_KEY not configured." }));
-      ws.close();
-      return;
-    }
-
-    try {
-      const session = await ai.live.connect({
-        model: "gemini-3.1-flash-live-preview",
-        config: {
-          responseModalities: ["AUDIO" as any],
-          speechConfig: {
-            voiceConfig: { prebuiltVoiceConfig: { voiceName: "Zephyr" } }
-          },
-          systemInstruction: "You are an onboard Vehicle Edge AI Copilot for Indian Urban Traffic SDVs. Keep spoken responses short, technical, and direct."
-        },
-        callbacks: {
-          onmessage: (message) => {
-            const audio = message.serverContent?.modelTurn?.parts?.[0]?.inlineData?.data;
-            if (audio) {
-              ws.send(JSON.stringify({ audio }));
-            }
-            if (message.serverContent?.interrupted) {
-              ws.send(JSON.stringify({ interrupted: true }));
-            }
-          }
-        }
-      });
-
-      ws.on("message", (data) => {
-        try {
-          const parsed = JSON.parse(data.toString());
-          if (parsed.audio) {
-            session.sendRealtimeInput({
-              audio: { data: parsed.audio, mimeType: "audio/pcm;rate=16000" }
-            });
-          }
-        } catch (e) {
-          console.error("Error parsing WS message:", e);
-        }
-      });
-
-      ws.on("close", () => {
-        session.close();
-      });
-    } catch (err: any) {
-      console.error("Live session connection error:", err);
-      ws.send(JSON.stringify({ error: err.message }));
-    }
-  });
-}
-
-startServer();
+  if (!process.env.VERCEL) {
+    startStandaloneServer();
+  }
