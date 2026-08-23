@@ -50,14 +50,15 @@ interface TourStep {
   onAction?: () => void;
 }
 
-export const UserTutorialModal: React.FC<Props> = ({
+export const UserTutorialModal: React.FC<Props & { onTriggerHeatwave?: () => void }> = ({
   isOpen,
   onClose,
   activeTab,
   setActiveTab,
   onTriggerCutInEvent,
   onToggleSimulation,
-  isSimulating
+  isSimulating,
+  onTriggerHeatwave
 }) => {
   const [currentStepIndex, setCurrentStepIndex] = useState(0);
   const [viewMode, setViewMode] = useState<"GUIDED_TOUR" | "FEATURE_INDEX">("GUIDED_TOUR");
@@ -133,8 +134,30 @@ export const UserTutorialModal: React.FC<Props> = ({
       proTip: "Watch the inverter junction temperature drop when switching from 10kHz fixed PWM to 6kHz Adaptive PWM."
     },
     {
+      id: "weather_thermal",
+      title: "3. Extreme Weather & Auto Thermal Optimization",
+      category: "Climate Resilience Simulation",
+      targetTab: "WORKBENCH",
+      icon: <Thermometer className="w-6 h-6 text-rose-400" />,
+      badge: "Hands-on Feature",
+      badgeColor: "bg-rose-500/20 text-rose-300 border-rose-500/30",
+      summary:
+        "India experiences brutal weather conditions. This new feature allows you to simulate Extreme Heatwaves (48°C), Monsoon Rain, and Winter Fog, observing direct impacts on powertrain efficiency.",
+      keyFeatures: [
+        "Climate Dropdown: Select 'HEATWAVE_DELHI' in the top header or Workbench.",
+        "Thermal Auto-Optimization: When battery temp exceeds 50°C, the system automatically intervenes.",
+        "HVAC Load Shedding: The SDV Edge immediately redirects HVAC compressor spillover to 20% to prioritize core powertrain cooling.",
+        "Visual Canvas Weather: Observe dynamic heat shimmer, rain streaks, and fog layers on the digital twin canvas."
+      ],
+      proTip: "Try setting the climate to 'Extreme Heatwave'. Watch the battery temperature climb past 50°C, triggering the 'THERMAL OPTIMIZATION ENGAGED' banner.",
+      interactiveActionLabel: "Trigger Thermal Heatwave",
+      onAction: () => {
+        if (onTriggerHeatwave) onTriggerHeatwave();
+      }
+    },
+    {
       id: "workbench",
-      title: "3. SDV Architecture Workbench",
+      title: "4. SDV Architecture Workbench",
       category: "Architectural Tuning",
       targetTab: "WORKBENCH",
       icon: <Sliders className="w-6 h-6 text-purple-400" />,

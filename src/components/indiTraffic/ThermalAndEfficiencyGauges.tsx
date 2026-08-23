@@ -128,8 +128,8 @@ export const ThermalAndEfficiencyGauges: React.FC<Props> = ({ metrics, config })
             <div className={`text-xl font-mono font-bold ${isCriticalThermal ? "text-rose-400 animate-pulse" : "text-white"}`}>
               {metrics.battery_pack_temp_c.toFixed(1)}°C
             </div>
-            <p className="text-[10px] text-slate-400">
-              Amb: {metrics.ambient_temp_c}°C ({isCriticalThermal ? "CRITICAL FAILURE" : isBaseline ? "High Derate" : "Safe Chill"})
+            <p className="text-[10px] text-slate-400 font-mono">
+              Amb: {metrics.ambient_temp_c.toFixed(1)}°C ({config.weatherCondition === "HEATWAVE_DELHI" ? "Heatwave" : config.weatherCondition === "MONSOON_MUMBAI" ? "Monsoon" : config.weatherCondition === "WINTER_FOG_NORTH" ? "Winter Fog" : "Moderate"})
             </p>
           </div>
           <div className="w-full bg-slate-800 h-1.5 rounded-full overflow-hidden">

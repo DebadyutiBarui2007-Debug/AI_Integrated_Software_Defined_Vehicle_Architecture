@@ -4,6 +4,12 @@ export type IndianTrafficScenario =
   | "MONSOON_MUMBAI"
   | "CYBER_HUB_HEAT_TRANSITION";
 
+export type WeatherCondition =
+  | "HEATWAVE_DELHI"
+  | "MONSOON_MUMBAI"
+  | "WINTER_FOG_NORTH"
+  | "CLEAR_MODERATE";
+
 export type VehicleArchType = "LEGACY_CONVENTIONAL_EV" | "INDITRAFFIC_SDV_EDGE";
 
 export type InverterPwmMode = "FIXED_10KHZ" | "ADAPTIVE_CREEP_6KHZ" | "PHASE_SHEDDING_4KHZ";
@@ -46,6 +52,7 @@ export interface TrafficMetrics {
 export interface ArchitectureConfig {
   archType: VehicleArchType;
   scenario: IndianTrafficScenario;
+  weatherCondition: WeatherCondition;
   pwmMode: InverterPwmMode;
   microRegenMode: MicroRegenMode;
   lowSpeedRegenCutoffKmh: number; // 1.5 to 15.0 km/h

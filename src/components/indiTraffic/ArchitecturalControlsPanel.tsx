@@ -1,6 +1,6 @@
 import React from "react";
-import { ArchitectureConfig, IndianTrafficScenario, InverterPwmMode, MicroRegenMode, VehicleArchType } from "../../types/indiTraffic";
-import { Sliders, Cpu, Activity, Zap, Shield, IndianRupee } from "lucide-react";
+import { ArchitectureConfig, IndianTrafficScenario, InverterPwmMode, MicroRegenMode, VehicleArchType, WeatherCondition } from "../../types/indiTraffic";
+import { Sliders, Cpu, Activity, Zap, Shield, IndianRupee, Thermometer, Flame, CloudRain, CloudFog, Sun } from "lucide-react";
 
 interface Props {
   config: ArchitectureConfig;
@@ -78,6 +78,39 @@ export const ArchitecturalControlsPanel: React.FC<Props> = ({ config, onChange }
       </div>
 
       <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-5">
+        {/* Extreme Weather Simulation Selector */}
+        <div className="bg-slate-950 p-3.5 rounded-lg border border-amber-500/20 shadow-md relative overflow-hidden">
+          <div className="absolute top-0 right-0 w-24 h-24 bg-amber-500/5 rounded-full blur-2xl pointer-events-none" />
+          <label className="text-xs font-semibold text-slate-300 flex items-center justify-between mb-2">
+            <span className="flex items-center gap-1.5">
+              <Thermometer className="w-4 h-4 text-amber-400" />
+              Extreme Climate Simulation
+            </span>
+            <span className="text-[10px] font-mono px-1.5 py-0.5 rounded bg-amber-500/10 text-amber-400 border border-amber-500/20 font-bold">
+              {config.weatherCondition === "HEATWAVE_DELHI" && "48°C Heat"}
+              {config.weatherCondition === "MONSOON_MUMBAI" && "26°C Rain"}
+              {config.weatherCondition === "WINTER_FOG_NORTH" && "8°C Fog"}
+              {config.weatherCondition === "CLEAR_MODERATE" && "25°C Fair"}
+            </span>
+          </label>
+          <select
+            value={config.weatherCondition}
+            onChange={(e) => onChange({ ...config, weatherCondition: e.target.value as WeatherCondition })}
+            className="w-full bg-slate-900 border border-slate-700 text-slate-200 text-xs rounded-md p-2 focus:outline-none focus:ring-1 focus:ring-amber-500 font-medium"
+          >
+            <option value="HEATWAVE_DELHI">🔥 Extreme Heatwave (48°C Delhi Summer)</option>
+            <option value="MONSOON_MUMBAI">🌧️ Monsoon Rain (26°C Water Logging Drag)</option>
+            <option value="WINTER_FOG_NORTH">🌫️ Winter Dense Fog (8°C PTC Heating Load)</option>
+            <option value="CLEAR_MODERATE">☀️ Clear / Moderate (25°C Optimal Ambient)</option>
+          </select>
+          <p className="text-[11px] text-slate-400 mt-2 flex items-center gap-1">
+            {config.weatherCondition === "HEATWAVE_DELHI" && "AC compressor thermal burden +35 Wh/km & battery heat soak risk."}
+            {config.weatherCondition === "MONSOON_MUMBAI" && "Hydrodynamic splash drag +28 Wh/km & reduced road friction."}
+            {config.weatherCondition === "WINTER_FOG_NORTH" && "PTC cabin heater + battery preconditioning load +22 Wh/km."}
+            {config.weatherCondition === "CLEAR_MODERATE" && "Standard nominal rolling resistance & baseline HVAC drain."}
+          </p>
+        </div>
+
         {/* Scenario Selector */}
         <div className="bg-slate-950 p-3.5 rounded-lg border border-slate-800">
           <label className="text-xs font-semibold text-slate-300 flex items-center gap-1.5 mb-2">

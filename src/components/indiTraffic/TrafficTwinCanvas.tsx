@@ -11,6 +11,15 @@ interface Props {
 
 export const TrafficTwinCanvas: React.FC<Props> = ({ metrics, config, isSimulating }) => {
   const canvasRef = useRef<HTMLCanvasElement | null>(null);
+  const metricsRef = useRef(metrics);
+  const configRef = useRef(config);
+
+  // Keep refs up to date without triggering effect teardown
+  useEffect(() => {
+    metricsRef.current = metrics;
+    configRef.current = config;
+  }, [metrics, config]);
+
   const forecast = calculateTrafficForecast(metrics, config);
 
   useEffect(() => {
@@ -23,6 +32,9 @@ export const TrafficTwinCanvas: React.FC<Props> = ({ metrics, config, isSimulati
     let offset = 0;
 
     const render = () => {
+      const currentMetrics = metricsRef.current;
+      const currentConfig = configRef.current;
+
       ctx.clearRect(0, 0, canvas.width, canvas.height);
 
       const width = canvas.width;
@@ -44,7 +56,7 @@ export const TrafficTwinCanvas: React.FC<Props> = ({ metrics, config, isSimulati
 
       // Lane dividers (moving with speed)
       if (isSimulating) {
-        offset = (offset + metrics.vehicle_speed_kmh * 0.15) % 40;
+        offset = (offset + currentMetrics.vehicle_speed_kmh * 0.15) % 40;
       }
       ctx.setLineDash([20, 20]);
       ctx.lineDashOffset = -offset;
@@ -56,8 +68,64 @@ export const TrafficTwinCanvas: React.FC<Props> = ({ metrics, config, isSimulati
       ctx.stroke();
       ctx.setLineDash([]); // Reset dash
 
+      // DYNAMIC WEATHER CANVASES OVERLAY (Monsoon Rain / Heatwave Shimmer / Winter Fog)
+      if (currentConfig.weatherCondition === "MONSOON_MUMBAI") {
+        // Rain streaks
+        ctx.strokeStyle = "rgba(186, 230, 253, 0.45)";
+        ctx.lineWidth = 1.2;
+        ctx.beginPath();
+        for (let i = 0; i < 40; i++) {
+          const rx = (i * 28 + offset * 8) % width;
+          const ry = (i * 17 + offset * 12) % height;
+          ctx.moveTo(rx, ry);
+          ctx.lineTo(rx - 10, ry + 18);
+        }
+        ctx.stroke();
+
+        // Water splash ripple under vehicle
+        ctx.strokeStyle = "rgba(56, 189, 248, 0.35)";
+        ctx.lineWidth = 1.5;
+        ctx.beginPath();
+        ctx.ellipse(width * 0.35 + 50, height * 0.5 + 24, 32, 6, 0, 0, Math.PI * 2);
+        ctx.stroke();
+
+        // Canvas Monsoon Tag
+        ctx.fillStyle = "#38bdf8";
+        ctx.font = "bold 10px monospace";
+        ctx.fillText(`🌧️ MONSOON WATER-LOGGING | Friction 0.42 | Hydrodynamic Drag +28 Wh/km`, 12, 20);
+      } else if (currentConfig.weatherCondition === "HEATWAVE_DELHI") {
+        // Ambient heat shimmer overlay
+        const heatGrad = ctx.createLinearGradient(0, 0, 0, height);
+        heatGrad.addColorStop(0, "rgba(244, 63, 94, 0.08)");
+        heatGrad.addColorStop(0.5, "rgba(245, 158, 11, 0.04)");
+        heatGrad.addColorStop(1, "rgba(244, 63, 94, 0.08)");
+        ctx.fillStyle = heatGrad;
+        ctx.fillRect(0, 0, width, height);
+
+        // Canvas Heatwave Tag
+        ctx.fillStyle = "#f43f5e";
+        ctx.font = "bold 10px monospace";
+        ctx.fillText(`🔥 EXTREME HEATWAVE 48°C | HVAC Burden 3.8 kW | Inverter Heat Soak Risk`, 12, 20);
+      } else if (currentConfig.weatherCondition === "WINTER_FOG_NORTH") {
+        // Fog haze gradient
+        const fogGrad = ctx.createLinearGradient(width * 0.3, 0, width, 0);
+        fogGrad.addColorStop(0, "rgba(203, 213, 225, 0.02)");
+        fogGrad.addColorStop(1, "rgba(203, 213, 225, 0.22)");
+        ctx.fillStyle = fogGrad;
+        ctx.fillRect(0, 0, width, height);
+
+        // Canvas Fog Tag
+        ctx.fillStyle = "#a5b4fc";
+        ctx.font = "bold 10px monospace";
+        ctx.fillText(`🌫️ WINTER DENSE FOG 8°C | PTC Cabin Heating Load +22 Wh/km`, 12, 20);
+      } else {
+        ctx.fillStyle = "#10b981";
+        ctx.font = "bold 10px monospace";
+        ctx.fillText(`☀️ OPTIMAL CLIMATE 25°C | Nominal Rolling Drag & Baseline Auxiliary Load`, 12, 20);
+      }
+
       // 5-MIN PREDICTIVE TRAFFIC JAM HAZARD OVERLAY ON CANVAS ROAD
-      const forecastData = calculateTrafficForecast(metrics, config);
+      const forecastData = calculateTrafficForecast(currentMetrics, currentConfig);
       const isJamAhead = forecastData.jamRiskScore >= 35;
       const hazardStartX = width * 0.68;
       const hazardWidth = width * 0.3;
@@ -107,7 +175,7 @@ export const TrafficTwinCanvas: React.FC<Props> = ({ metrics, config, isSimulati
         egoY + egoH / 2,
         220
       );
-      if (metrics.cut_in_probability > 0.6) {
+      if (currentMetrics.cut_in_probability > 0.6) {
         coneGradient.addColorStop(0, "rgba(239, 68, 68, 0.4)");
         coneGradient.addColorStop(1, "rgba(239, 68, 68, 0.0)");
       } else {
@@ -123,7 +191,7 @@ export const TrafficTwinCanvas: React.FC<Props> = ({ metrics, config, isSimulati
       ctx.fill();
 
       // Ego Vehicle Body
-      ctx.fillStyle = config.archType === "INDITRAFFIC_SDV_EDGE" ? "#0284c7" : "#475569";
+      ctx.fillStyle = currentConfig.archType === "INDITRAFFIC_SDV_EDGE" ? "#0284c7" : "#475569";
       ctx.beginPath();
       ctx.roundRect(egoX, egoY, egoW, egoH, 10);
       ctx.fill();
@@ -144,7 +212,7 @@ export const TrafficTwinCanvas: React.FC<Props> = ({ metrics, config, isSimulati
         egoY + egoH / 2,
         25
       );
-      const isThermalHigh = metrics.inverter_junction_temp_c > 85;
+      const isThermalHigh = currentMetrics.inverter_junction_temp_c > 85;
       invGlow.addColorStop(0, isThermalHigh ? "rgba(239, 68, 68, 0.9)" : "rgba(56, 189, 248, 0.9)");
       invGlow.addColorStop(1, "rgba(0, 0, 0, 0)");
       ctx.fillStyle = invGlow;
@@ -154,7 +222,7 @@ export const TrafficTwinCanvas: React.FC<Props> = ({ metrics, config, isSimulati
 
       // 3. Draw Chaotic Swarm Obstacles (Indian Traffic Cut-ins)
       // Auto-rickshaw ahead
-      const autoX = egoX + egoW + Math.max(20, metrics.creep_distance_m * 12);
+      const autoX = egoX + egoW + Math.max(20, currentMetrics.creep_distance_m * 12);
       const autoY = height * 0.5 - 22;
       ctx.fillStyle = "#f59e0b"; // Auto Yellow/Green
       ctx.beginPath();
@@ -166,7 +234,7 @@ export const TrafficTwinCanvas: React.FC<Props> = ({ metrics, config, isSimulati
       ctx.fillText("AUTO", autoX + 12, autoY + 24);
 
       // Two-wheeler Motorbike splitting lanes
-      const bikeX = egoX + egoW + Math.max(10, metrics.creep_distance_m * 8) - 15;
+      const bikeX = egoX + egoW + Math.max(10, currentMetrics.creep_distance_m * 8) - 15;
       const bikeY = height * 0.28;
       ctx.fillStyle = "#ec4899";
       ctx.fillRect(bikeX, bikeY, 35, 16);
@@ -174,7 +242,7 @@ export const TrafficTwinCanvas: React.FC<Props> = ({ metrics, config, isSimulati
       ctx.fillText("2W", bikeX + 6, bikeY + 12);
 
       // Draw Trajectory Cut-In Vector Line
-      if (metrics.cut_in_probability > 0.4) {
+      if (currentMetrics.cut_in_probability > 0.4) {
         ctx.strokeStyle = "#ef4444";
         ctx.setLineDash([4, 4]);
         ctx.lineWidth = 2;
@@ -186,7 +254,7 @@ export const TrafficTwinCanvas: React.FC<Props> = ({ metrics, config, isSimulati
       }
 
       // 4. Overlay Regenerative vs Friction Energy Flow Vectors
-      if (metrics.regen_torque_nm > 5) {
+      if (currentMetrics.regen_torque_nm > 5) {
         // Green Regen Flow arrows returning to battery
         ctx.strokeStyle = "#10b981";
         ctx.lineWidth = 3;
@@ -197,8 +265,8 @@ export const TrafficTwinCanvas: React.FC<Props> = ({ metrics, config, isSimulati
 
         ctx.fillStyle = "#10b981";
         ctx.font = "10px monospace";
-        ctx.fillText(`+REGEN ${metrics.regen_torque_nm.toFixed(0)}Nm`, egoX - 95, egoY + egoH / 2 + 3);
-      } else if (metrics.friction_brake_torque_nm > 5) {
+        ctx.fillText(`+REGEN ${currentMetrics.regen_torque_nm.toFixed(0)}Nm`, egoX - 95, egoY + egoH / 2 + 3);
+      } else if (currentMetrics.friction_brake_torque_nm > 5) {
         // Red Friction Loss
         ctx.strokeStyle = "#ef4444";
         ctx.lineWidth = 3;
@@ -209,7 +277,7 @@ export const TrafficTwinCanvas: React.FC<Props> = ({ metrics, config, isSimulati
 
         ctx.fillStyle = "#ef4444";
         ctx.font = "10px monospace";
-        ctx.fillText(`FRICTION LOSS ${metrics.friction_brake_torque_nm.toFixed(0)}Nm`, egoX + 40, egoY + egoH + 32);
+        ctx.fillText(`FRICTION LOSS ${currentMetrics.friction_brake_torque_nm.toFixed(0)}Nm`, egoX + 40, egoY + egoH + 32);
       }
 
       animationFrameId = requestAnimationFrame(render);
@@ -220,7 +288,7 @@ export const TrafficTwinCanvas: React.FC<Props> = ({ metrics, config, isSimulati
     return () => {
       cancelAnimationFrame(animationFrameId);
     };
-  }, [metrics, config, isSimulating]);
+  }, [isSimulating]);
 
   return (
     <div className="bg-slate-900 border border-slate-800 rounded-xl p-4 shadow-xl text-slate-100 relative">
