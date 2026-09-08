@@ -113,8 +113,8 @@ Follow these instructions to set up the project locally on your machine.
 
 1. **Clone the repository**
    ```bash
-   git clone https://github.com/your-username/inditraffic-sdv.git
-   cd inditraffic-sdv
+   git clone https://github.com/DebadyutiBarui2007-Debug/AI_Integrated_Software_Defined_Vehicle_Architecture.git
+   cd AI_Integrated_Software_Defined_Vehicle_Architecture
    ```
 
 2. **Install dependencies**
